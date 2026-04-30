@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Endometriosis Clinical Assessment — Vol. I</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="page-content">
+
+  <!-- Masthead -->
+  <header class="masthead">
+    <span class="masthead-vol">Vol. I &middot; No. 01</span>
+    <span class="masthead-label">Clinical Decision Support</span>
+    <span class="masthead-date" id="masthead-date"></span>
+  </header>
+
+  <main class="container">
+
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-headline">
+      <span class="hero-eyebrow">Endometriosis Risk Assessment</span>
+      <h1 class="hero-headline" id="hero-headline">
+        A symptom <em>weighted</em> diagnostic instrument.
+      </h1>
+      <p class="hero-lede">
+        This instrument calculates a cumulative correlation score across 25 clinical indicators,
+        calibrated against a 200-patient reference cohort with laparoscopically confirmed diagnoses.
+        Scores are stratified into five risk clusters for clinical decision guidance.
+      </p>
+      <p class="hero-greeting">
+        <span class="hero-ornament">❦</span>
+        Welcome, Doctor
+        <span class="hero-ornament">❦</span>
+      </p>
+    </section>
+
+    <!-- Section I: Questionnaire -->
+    <section aria-labelledby="section-I-title">
+      <div class="section-header">
+        <span class="section-numeral">I.</span>
+        <span class="section-title" id="section-I-title">Symptom Questionnaire</span>
+      </div>
+
+      <form id="assessment-form" novalidate>
+        <ol class="symptom-list" id="symptom-list">
+          <!-- Rendered by JS -->
+        </ol>
+
+        <div class="form-footer">
+          <p class="progress-counter" id="progress-counter" aria-live="polite">
+            Answered: 0 / 25
+          </p>
+          <div class="bulk-actions">
+            <button type="button" class="bulk-btn" id="mark-all-no">Mark all No</button>
+            <button type="button" class="bulk-btn" id="reset-all">Reset</button>
+          </div>
+          <p class="form-error" id="form-error" role="alert" aria-live="polite"></p>
+          <button type="submit" class="submit-btn">Generate Assessment &rarr;</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section II: Result Panel (hidden until submit) -->
+    <section id="result-panel" aria-labelledby="result-headline" hidden>
+      <div class="section-header">
+        <span class="section-numeral">II.</span>
+        <span class="section-title">Assessment Result</span>
+      </div>
+
+      <span class="stamp-tab">Assessment Generated</span>
+
+      <h2 class="result-headline" id="result-headline"></h2>
+
+      <div class="score-grid" role="region" aria-label="Score summary">
+        <div class="score-cell">
+          <div class="score-numeral">
+            <span class="score-value" aria-label="Score">0.00</span>
+            <span class="score-max">/ 11.10</span>
+          </div>
+          <p class="score-sublabel">Cumulative Correlation Score</p>
+        </div>
+        <div class="cluster-cell" aria-label="Cluster">
+          <div class="cluster-top">
+            <span class="cluster-swatch" aria-hidden="true"></span>
+            <span class="cluster-name"></span>
+          </div>
+          <span class="cluster-label"></span>
+        </div>
+      </div>
+
+      <div class="gauge-wrap" role="img" aria-label="Risk gauge">
+        <div class="gauge-bar">
+          <div class="gauge-segment"></div>
+          <div class="gauge-segment"></div>
+          <div class="gauge-segment"></div>
+          <div class="gauge-segment"></div>
+          <div class="gauge-segment"></div>
+          <span class="gauge-marker" aria-hidden="true">&#9660;</span>
+        </div>
+        <div class="gauge-labels">
+          <span>Very Low</span>
+          <span>Low</span>
+          <span>Moderate</span>
+          <span>High</span>
+          <span>Very High</span>
+        </div>
+      </div>
+
+      <div class="interpretation-block">
+        <p class="interpretation-title">Clinical Interpretation</p>
+        <div class="interpretation-body"></div>
+      </div>
+
+      <div class="factors-block">
+        <p class="factors-title">Principal Contributing Factors</p>
+        <ol class="factors-list" aria-label="Top contributing symptoms"></ol>
+      </div>
+
+      <div class="recommendation-block">
+        <p class="recommendation-title">Clinical Recommendation</p>
+        <p class="recommendation-text"></p>
+      </div>
+
+      <p class="disclaimer">
+        Disclaimer &mdash; This instrument provides probabilistic risk stratification only.
+        Laparoscopic visualization with histological confirmation remains the diagnostic
+        gold standard for endometriosis. Results should be interpreted by a qualified
+        clinician in the context of the full clinical picture.
+      </p>
+    </section>
+
+  </main>
+
+  <!-- Colophon -->
+  <footer class="colophon container">
+    Set in Fraunces &amp; Newsreader &nbsp;&middot;&nbsp; Reference cohort n&nbsp;=&nbsp;200 &nbsp;&middot;&nbsp; For clinical research use
+  </footer>
+
+</div><!-- .page-content -->
+
+<!-- Chat Launcher -->
+<button class="chat-launcher" id="chat-launcher" aria-label="Open clinical assistant chat" title="Ask the clinical assistant">
+  ASK
+</button>
+
+<!-- Chat Panel -->
+<div class="chat-panel" id="chat-panel" role="dialog" aria-label="Clinical assistant chat" aria-modal="true">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <p class="chat-title">Clinical Assistant</p>
+      <p class="chat-subtitle">Ask about this assessment</p>
+      <button class="chat-key-link" id="change-api-key" type="button">Change API key</button>
+    </div>
+    <button class="chat-close" id="chat-close" aria-label="Close chat">&times;</button>
+  </div>
+  <div class="chat-messages" id="chat-messages" aria-live="polite" aria-atomic="false">
+    <!-- Messages rendered by JS -->
+  </div>
+  <div class="suggestion-chips" id="suggestion-chips">
+    <button class="suggestion-chip" data-prompt="Explain why this cluster" type="button">Explain why this cluster</button>
+    <button class="suggestion-chip" data-prompt="What differentials should I consider?" type="button">What differentials should I consider?</button>
+    <button class="suggestion-chip" data-prompt="Recommend imaging strategy" type="button">Recommend imaging strategy</button>
+  </div>
+  <div class="chat-input-area">
+    <textarea
+      id="chat-input"
+      placeholder="Ask a clinical question…"
+      rows="1"
+      aria-label="Ask the clinical assistant"
+    ></textarea>
+    <button id="chat-send" type="button">Send</button>
+  </div>
+</div>
+
+<!-- API Key Modal -->
+<div class="modal-overlay" id="api-key-modal" hidden role="dialog" aria-labelledby="modal-title" aria-modal="true">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-title">Anthropic API Key</h2>
+    <p class="modal-sub">
+      Required to use the clinical assistant. Your key is stored in session storage only
+      and is cleared when you close this tab. It is never sent to any server other than
+      api.anthropic.com.
+    </p>
+    <input
+      type="password"
+      id="api-key-input"
+      class="modal-input"
+      placeholder="sk-ant-…"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <div class="modal-actions">
+      <button class="modal-btn" id="api-key-cancel" type="button">Cancel</button>
+      <button class="modal-btn modal-btn--primary" id="api-key-submit" type="button">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { SYMPTOMS } from './data.js';
+  import { computeScore, renderResult } from './assessment.js';
+  import { initChat, injectAssessmentContext } from './chat.js';
+
+  // Masthead date
+  const dateEl = document.getElementById('masthead-date');
+  dateEl.textContent = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  // Build symptom list
+  const list = document.getElementById('symptom-list');
+  const answers = {};
+
+  SYMPTOMS.forEach((symptom, idx) => {
+    answers[symptom.key] = null;
+    const li = document.createElement('li');
+    li.className = 'symptom-row';
+
+    const num = String(idx + 1).padStart(2, '0');
+    li.innerHTML = `
+      <span class="symptom-counter" aria-hidden="true">${num}</span>
+      <span class="symptom-info">
+        <span class="symptom-label">${symptom.label}</span>
+        <span class="symptom-meta">
+          ${symptom.sub}
+          <span class="symptom-weight">w&nbsp;=&nbsp;${symptom.corr.toFixed(2)}</span>
+        </span>
+      </span>
+      <div class="toggle-group" role="radiogroup" aria-label="${symptom.label}">
+        <button
+          type="button"
+          class="toggle-btn"
+          data-key="${symptom.key}"
+          data-val="yes"
+          aria-pressed="false"
+          aria-label="${symptom.label}: Yes"
+        >Yes</button>
+        <button
+          type="button"
+          class="toggle-btn"
+          data-key="${symptom.key}"
+          data-val="no"
+          aria-pressed="false"
+          aria-label="${symptom.label}: No"
+        >No</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+
+  // Toggle logic
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('.toggle-btn');
+    if (!btn) return;
+    const key = btn.dataset.key;
+    const val = btn.dataset.val === 'yes';
+
+    answers[key] = val;
+
+    const group = btn.closest('.toggle-group');
+    group.querySelectorAll('.toggle-btn').forEach(b => {
+      b.setAttribute('aria-pressed', (b.dataset.val === 'yes') === val ? 'true' : 'false');
+    });
+
+    updateProgress();
+  });
+
+  function updateProgress() {
+    const answered = Object.values(answers).filter(v => v !== null).length;
+    document.getElementById('progress-counter').textContent = `Answered: ${answered} / 25`;
+  }
+
+  // Bulk actions
+  document.getElementById('mark-all-no').addEventListener('click', () => {
+    SYMPTOMS.forEach(s => { answers[s.key] = false; });
+    list.querySelectorAll('.toggle-group').forEach(group => {
+      group.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.setAttribute('aria-pressed', btn.dataset.val === 'no' ? 'true' : 'false');
+      });
+    });
+    updateProgress();
+  });
+
+  document.getElementById('reset-all').addEventListener('click', () => {
+    SYMPTOMS.forEach(s => { answers[s.key] = null; });
+    list.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.setAttribute('aria-pressed', 'false');
+    });
+    updateProgress();
+    document.getElementById('form-error').textContent = '';
+    document.getElementById('result-panel').hidden = true;
+  });
+
+  // Submit
+  document.getElementById('assessment-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const unanswered = Object.values(answers).filter(v => v === null).length;
+    const errorEl = document.getElementById('form-error');
+
+    if (unanswered > 0) {
+      errorEl.textContent = `Please answer all ${unanswered} remaining symptom${unanswered > 1 ? 's' : ''} before generating the assessment.`;
+      return;
+    }
+
+    errorEl.textContent = '';
+    const result = computeScore(answers);
+    renderResult(result);
+    injectAssessmentContext(result);
+  });
+
+  // Init chat
+  initChat();
+</script>
+</body>
+</html>
