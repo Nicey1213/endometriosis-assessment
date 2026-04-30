@@ -1,6 +1,6 @@
 # Endometriosis Clinical Assessment Tool
 
-A single-page clinical decision support application for physicians performing endometriosis symptom assessments, with an integrated AI chat assistant powered by the Anthropic API.
+A single-page clinical decision support application for physicians performing endometriosis symptom assessments, with an integrated AI-powered patient brochure generator.
 
 ## Important Notice
 
@@ -22,7 +22,7 @@ The reference cohort of n = 200 patients was a synthetic dataset used to calibra
 
 ## How to Run
 
-No build step required. Open `index.html` directly in any modern browser:
+No build step required. The assessment tool itself runs without any API key. Open `index.html` directly in any modern browser:
 
 ```
 open index.html
@@ -38,36 +38,40 @@ python -m http.server 8080
 
 Then visit `http://localhost:8080`.
 
-## AI Chat Assistant
+## Patient Brochure Agent
 
-The integrated clinical assistant calls the Anthropic API directly from your browser using your own API key.
+After an assessment is complete, the doctor can generate a personalized take-home brochure for the patient. Click **"Generate Brochure →"** in Section III of the result panel.
 
-### API Key Storage
+The brochure is created by an AI agent that reviews the patient's specific symptom profile and produces dual-branch guidance — how to manage symptoms if endometriosis is confirmed, and what alternative workups to consider if it is ruled out. The content is written in plain, accessible language suitable for patients, not clinical jargon.
 
-- Your key is stored in **`sessionStorage` only** — it is cleared automatically when you close the browser tab.
-- It is **never** stored in `localStorage`, cookies, or sent to any server other than `api.anthropic.com`.
+**The brochure is regenerated on each request and may differ between runs.** It is intended as a starting point for the doctor to review and customize before sharing with the patient.
+
+Once generated, the brochure can be:
+- **Previewed inline** directly on the page
+- **Downloaded as a PDF** (A4 format, suitable for printing)
+- **Printed** directly from the browser
+
+### API Key for Brochure Generation
+
+The brochure agent calls the Anthropic API directly from your browser using your own API key.
+
+- Your key is stored in **`sessionStorage` only** — cleared automatically when you close the tab.
+- It is **never** stored in `localStorage`, cookies, or sent anywhere except `api.anthropic.com`.
 - To obtain an API key, visit: https://console.anthropic.com/
 
-### What the assistant knows
-
-Once you generate an assessment, the assistant automatically receives (as a hidden system context message):
-
-- All 25 symptom answers (Yes/No)
-- The calculated score and cluster
-- The top 3 contributing factors
-
-You can then ask follow-up questions about the specific patient's presentation.
+The scoring assessment itself works with **no API key required**.
 
 ## File Structure
 
 ```
 endometriosis-assessment/
-├── index.html       — page markup, form logic, module bootstrap
-├── styles.css       — all visual styling (no framework)
-├── data.js          — symptom definitions, cluster thresholds, recommendations
-├── assessment.js    — scoring logic and result rendering
-├── chat.js          — chat panel UI and Anthropic API streaming
-└── README.md        — this file
+├── index.html             — page markup, form logic, module bootstrap
+├── styles.css             — all screen styles (no framework)
+├── brochure-template.css  — print-only styles for PDF/print output
+├── data.js                — symptom definitions, cluster thresholds, recommendations
+├── assessment.js          — scoring logic and result rendering
+├── brochure.js            — brochure agent, Anthropic API streaming, PDF download
+└── README.md              — this file
 ```
 
 ## Browser Requirements

@@ -1,0 +1,232 @@
+/* Print-only stylesheet — loaded alongside styles.css.
+   Hides all assessment UI; exposes only the brochure document. */
+
+@media print {
+
+  /* ── Hide everything except brochure ── */
+  .page-content,
+  .chat-launcher,
+  .chat-panel,
+  .modal-overlay,
+  .colophon {
+    display: none !important;
+  }
+
+  #brochure-preview {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .brochure-actions-top,
+  .no-print {
+    display: none !important;
+  }
+
+  /* ── Page setup ── */
+  @page {
+    size: A4 portrait;
+    margin: 20mm 18mm;
+  }
+
+  /* ── Base typography ── */
+  body {
+    font-family: 'Newsreader', Georgia, serif !important;
+    font-size: 11pt !important;
+    line-height: 1.65 !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  /* ── Brochure document ── */
+  .brochure-doc {
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+  }
+
+  /* ── Header ── */
+  .brochure-doc-header {
+    text-align: center;
+    margin-bottom: 16pt;
+    padding-bottom: 8pt;
+    border-bottom: 1.5pt solid #000;
+  }
+
+  .brochure-eyebrow {
+    font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    font-size: 8pt !important;
+    letter-spacing: 0.2em !important;
+    text-transform: uppercase !important;
+    color: #444 !important;
+  }
+
+  .brochure-main-title {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-size: 22pt !important;
+    font-weight: 400 !important;
+    margin: 4pt 0 !important;
+  }
+
+  .brochure-prepared {
+    font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    font-size: 8pt !important;
+    color: #666 !important;
+  }
+
+  /* ── Ornaments ── */
+  .brochure-ornament {
+    text-align: center;
+    margin: 8pt 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ── Sections ── */
+  .brochure-section {
+    page-break-before: always;
+    margin-bottom: 0 !important;
+    padding-top: 12pt !important;
+  }
+
+  .brochure-doc-header + .brochure-ornament + .brochure-section {
+    page-break-before: avoid;
+  }
+
+  .brochure-section-title {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-size: 14pt !important;
+    font-weight: 400 !important;
+    border-bottom: 0.5pt solid #000 !important;
+    padding-bottom: 3pt !important;
+    margin-bottom: 8pt !important;
+  }
+
+  /* ── Pull quote ── */
+  .brochure-pullquote {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-size: 13pt !important;
+    font-style: italic !important;
+    border-left: 2pt solid #8b1e1e !important;
+    padding-left: 10pt !important;
+    margin: 0 0 8pt 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ── Symptom cards ── */
+  .brochure-card {
+    page-break-inside: avoid !important;
+    border: 0.5pt solid #ccc !important;
+    padding: 6pt 8pt !important;
+    margin-bottom: 6pt !important;
+    background: #fff !important;
+  }
+
+  .brochure-card-title {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-size: 11pt !important;
+    margin-bottom: 3pt !important;
+  }
+
+  .brochure-tips {
+    font-size: 10pt !important;
+    padding-left: 14pt !important;
+  }
+
+  /* ── Strategies list ── */
+  .brochure-strategies {
+    font-size: 10pt !important;
+    padding-left: 16pt !important;
+  }
+
+  .brochure-strategies li { margin-bottom: 3pt !important; }
+
+  /* ── Differential table ── */
+  .brochure-diff-block {
+    page-break-inside: avoid !important;
+    margin-bottom: 10pt !important;
+  }
+
+  .brochure-diff-system {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-size: 11pt !important;
+    margin-bottom: 2pt !important;
+  }
+
+  .brochure-diff-rationale {
+    font-size: 9.5pt !important;
+    font-style: italic !important;
+    color: #444 !important;
+    margin-bottom: 3pt !important;
+  }
+
+  .brochure-diff-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9.5pt !important;
+  }
+
+  .brochure-diff-table th,
+  .brochure-diff-table td {
+    border: 0.5pt solid #aaa !important;
+    padding: 3pt 5pt !important;
+    text-align: left !important;
+  }
+
+  .brochure-diff-table th {
+    background: #f0f0f0 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8pt !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ── Questions checklist ── */
+  .brochure-questions-list {
+    list-style: none !important;
+    padding: 0 !important;
+  }
+
+  .brochure-question {
+    display: flex !important;
+    gap: 8pt !important;
+    padding: 3pt 0 !important;
+    border-bottom: 0.3pt solid #ddd !important;
+    font-size: 10.5pt !important;
+    page-break-inside: avoid !important;
+  }
+
+  .brochure-checkbox {
+    font-size: 12pt !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* ── Closing section ── */
+  .brochure-section--closing .brochure-closing {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-style: italic !important;
+    font-size: 11.5pt !important;
+    text-align: center !important;
+  }
+
+  /* ── Footer ── */
+  .brochure-doc-footer {
+    font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    font-size: 7.5pt !important;
+    color: #666 !important;
+    text-align: center !important;
+    border-top: 0.5pt solid #ccc !important;
+    padding-top: 6pt !important;
+    margin-top: 16pt !important;
+  }
+
+}
