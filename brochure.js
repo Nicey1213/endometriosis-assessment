@@ -74,17 +74,30 @@ const OLLAMA_MODEL = 'llama3.2';
 // ─── Prompt builder ────────────────────────────────────────────────────────────
 function buildPrompt(result) {
   const { score, cluster, topFactors, answers } = result;
-  const yes = SYMPTOMS.filter(s => answers[s.key]).map(s => s.label);
+  const yesSymptoms = SYMPTOMS.filter(s => answers[s.key]);
   const no  = SYMPTOMS.filter(s => !answers[s.key]).map(s => s.label);
   const top = topFactors.map(f => `${f.label} (+${f.contribution.toFixed(2)})`).join(', ');
-  return `Patient profile:
-- Reported symptoms (Yes): ${yes.join(', ') || 'None'}
-- Reported symptoms (No): ${no.join(', ') || 'None'}
-- Cumulative score: ${score.toFixed(2)}
-- Cluster: ${cluster.id} (${cluster.name}) — ${cluster.diagnosed_pct}% of reference cohort had confirmed diagnosis at this level
-- Top contributing factors: ${top || 'None'}
 
-Generate the personalized patient brochure as JSON.`;
+  const numberedSymptoms = yesSymptoms.length
+    ? yesSymptoms.map((s, i) => `  ${i + 1}. ${s.label} — ${s.sub}`).join('\n')
+    : '  (none reported)';
+
+  return `Patient profile:
+- Cumulative score: ${score.toFixed(2)} / 11.10
+- Cluster: ${cluster.id} (${cluster.name}) — ${cluster.diagnosed_pct}% confirmed diagnosis rate in reference cohort
+- Top contributing factors: ${top || 'None'}
+- Reported NO: ${no.join(', ') || 'None'}
+
+Reported YES symptoms (${yesSymptoms.length} total) — you MUST include ALL of these in the symptom_management array, one entry per symptom, in this exact order:
+${numberedSymptoms}
+
+RULES:
+- symptom_management must have exactly ${yesSymptoms.length} entries, one per symptom listed above.
+- Do not omit any symptom. Do not add symptoms not in the list above.
+- Each entry needs 3 practical tips written for a patient, not a doctor.
+- All other sections (if_diagnosis_confirmed, if_diagnosis_negative, questions_to_ask_doctor, closing_note) must also be fully completed.
+
+Generate the complete patient brochure JSON now.`;
 }
 
 // ─── Ollama streaming call ─────────────────────────────────────────────────────
@@ -93,12 +106,17 @@ async function streamAPI(prompt, onChunk, onDone, onError) {
   try {
     body = JSON.stringify({
       model: OLLAMA_MODEL,
-      format: 'json',     // forces JSON-only output — no prefill needed
+      format: 'json',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user',   content: prompt }
       ],
-      stream: true
+      stream: true,
+      options: {
+        temperature: 0.1,   // near-deterministic — reduces variety between runs
+        num_predict: 6000,  // enough tokens for a full brochure with many symptoms
+        num_ctx: 8192       // context window large enough for prompt + output
+      }
     });
   } catch { onError('Failed to build request.'); return; }
 
