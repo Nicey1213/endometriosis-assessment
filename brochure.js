@@ -68,70 +68,8 @@ const STATUS_STEPS = [
 
 let _lastResult = null;
 
-// ─── API key helpers ───────────────────────────────────────────────────────────
-function getKey() { return sessionStorage.getItem('anthropic_api_key'); }
-function saveKey(k) { sessionStorage.setItem('anthropic_api_key', k.trim()); }
-
-function ensureModal() {
-  if (document.getElementById('api-key-modal')) return;
-  const el = document.createElement('div');
-  el.className = 'modal-overlay';
-  el.id = 'api-key-modal';
-  el.hidden = true;
-  el.setAttribute('role', 'dialog');
-  el.setAttribute('aria-labelledby', 'modal-title');
-  el.setAttribute('aria-modal', 'true');
-  el.innerHTML = `
-    <div class="modal-box">
-      <h2 class="modal-title" id="modal-title">Anthropic API Key</h2>
-      <p class="modal-sub">
-        Required to generate the patient brochure. Stored in session memory only —
-        cleared automatically when you close this tab. Sent only to api.anthropic.com.
-      </p>
-      <input type="password" id="api-key-input" class="modal-input"
-             placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
-      <div class="modal-actions">
-        <button class="modal-btn" id="api-key-cancel" type="button">Cancel</button>
-        <button class="modal-btn modal-btn--primary" id="api-key-submit" type="button">Confirm</button>
-      </div>
-    </div>`;
-  document.body.appendChild(el);
-}
-
-function promptForKey() {
-  ensureModal();
-  return new Promise(resolve => {
-    const modal = document.getElementById('api-key-modal');
-    const inp   = document.getElementById('api-key-input');
-    const ok    = document.getElementById('api-key-submit');
-    const cancel= document.getElementById('api-key-cancel');
-    inp.value = '';
-    modal.hidden = false;
-    inp.focus();
-
-    function submit() {
-      const k = inp.value.trim();
-      if (!k) return;
-      saveKey(k);
-      modal.hidden = true;
-      cleanup();
-      resolve(k);
-    }
-    function dismiss() { modal.hidden = true; cleanup(); resolve(null); }
-    function onKey(e) {
-      if (e.key === 'Enter') submit();
-      if (e.key === 'Escape') dismiss();
-    }
-    ok.addEventListener('click', submit);
-    cancel.addEventListener('click', dismiss);
-    inp.addEventListener('keydown', onKey);
-    function cleanup() {
-      ok.removeEventListener('click', submit);
-      cancel.removeEventListener('click', dismiss);
-      inp.removeEventListener('keydown', onKey);
-    }
-  });
-}
+const OLLAMA_URL = 'http://localhost:11434/api/chat';
+const OLLAMA_MODEL = 'llama3.2';
 
 // ─── Prompt builder ────────────────────────────────────────────────────────────
 function buildPrompt(result) {
@@ -149,17 +87,16 @@ function buildPrompt(result) {
 Generate the personalized patient brochure as JSON.`;
 }
 
-// ─── Anthropic streaming call ──────────────────────────────────────────────────
-async function streamAPI(apiKey, prompt, onChunk, onDone, onError) {
+// ─── Ollama streaming call ─────────────────────────────────────────────────────
+async function streamAPI(prompt, onChunk, onDone, onError) {
   let body;
   try {
     body = JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
+      model: OLLAMA_MODEL,
+      format: 'json',     // forces JSON-only output — no prefill needed
       messages: [
-        { role: 'user',      content: prompt },
-        { role: 'assistant', content: '{' }   // prefill forces JSON-only output
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user',   content: prompt }
       ],
       stream: true
     });
@@ -167,32 +104,26 @@ async function streamAPI(apiKey, prompt, onChunk, onDone, onError) {
 
   let resp;
   try {
-    resp = await fetch('https://api.anthropic.com/v1/messages', {
+    resp = await fetch(OLLAMA_URL, {
       method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'content-type': 'application/json' },
       body
     });
-  } catch { onError('Connection error — please check your API key or try again.'); return; }
+  } catch {
+    onError('Could not connect to Ollama — make sure it is running (`ollama serve`) and OLLAMA_ORIGINS=* is set.');
+    return;
+  }
 
   if (!resp.ok) {
-    let msg = 'Connection error — please check your API key or try again.';
-    try {
-      const err = await resp.json();
-      if (err?.error?.message) msg = err.error.message;
-      if (resp.status === 429) msg = 'Rate limit reached — please wait a moment before retrying.';
-    } catch (_) {}
+    let msg = `Ollama error ${resp.status} — is the model installed? Run: ollama pull ${OLLAMA_MODEL}`;
+    try { const e = await resp.json(); if (e?.error) msg = e.error; } catch (_) {}
     onError(msg); return;
   }
 
   const reader  = resp.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
-  let acc = '{';
+  let acc = '';
 
   while (true) {
     const { done, value } = await reader.read();
@@ -201,16 +132,15 @@ async function streamAPI(apiKey, prompt, onChunk, onDone, onError) {
     const lines = buf.split('\n');
     buf = lines.pop();
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6).trim();
-      if (raw === '[DONE]') continue;
+      if (!line.trim()) continue;
       try {
-        const p = JSON.parse(raw);
-        if (p.type === 'content_block_delta' && p.delta?.text) {
-          acc += p.delta.text;
+        const p = JSON.parse(line);         // Ollama sends NDJSON, not SSE
+        if (!p.done) {
+          acc += p.message?.content ?? '';
           onChunk(acc);
+        } else {
+          onDone(acc);
         }
-        if (p.type === 'message_stop') onDone(acc);
       } catch (_) {}
     }
   }
@@ -424,7 +354,6 @@ async function runGeneration() {
     area.appendChild(w);
   }, 30000);
 
-  const apiKey = getKey();
   const prompt = buildPrompt(_lastResult);
   const date   = new Date().toISOString().slice(0, 10);
   let retried  = false;
@@ -443,9 +372,8 @@ async function runGeneration() {
         setStep(area, 3);
         const strictPrompt = prompt +
           '\n\nCRITICAL: Output ONLY valid JSON. No markdown fences, no prose, no explanation. Start with { end with }.';
-        let acc2 = '{';
-        await streamAPI(apiKey, strictPrompt,
-          c => { acc2 = c; },
+        await streamAPI(strictPrompt,
+          () => {},
           async t2 => {
             const d2 = tryParse(t2);
             if (!d2) { showError(area, btn, 'Could not parse brochure content. Please regenerate.'); return; }
@@ -467,7 +395,7 @@ async function runGeneration() {
   }
 
   await streamAPI(
-    apiKey, prompt,
+    prompt,
     () => {},           // chunks not used for progress display
     finish,
     err => { cleanup(); showError(area, btn, err); }
@@ -484,19 +412,8 @@ export function setBrochureResult(result) {
 }
 
 export function initBrochure() {
-  ensureModal();
   const btn = document.getElementById('brochure-generate-btn');
   if (!btn || btn._init) return;
   btn._init = true;
-
-  document.getElementById('brochure-change-key')?.addEventListener('click', async () => {
-    sessionStorage.removeItem('anthropic_api_key');
-    await promptForKey();
-  });
-
-  btn.addEventListener('click', async () => {
-    let key = getKey();
-    if (!key) { key = await promptForKey(); if (!key) return; }
-    runGeneration();
-  });
+  btn.addEventListener('click', () => runGeneration());
 }
