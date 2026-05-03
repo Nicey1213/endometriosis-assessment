@@ -1,18 +1,23 @@
 import { SYMPTOMS } from './data.js';
 
-const SYSTEM_PROMPT = `You are a patient education writer. Write in warm, plain language (8th-grade level). Address the patient as "you". Never diagnose or prescribe. Frame everything as things to discuss with their doctor.
+const SYSTEM_PROMPT = `You are a patient education writer. Write in warm, plain language (8th-grade level). Address the patient as "you".
+
+CRITICAL RULES — never break these:
+- Never state or imply a diagnosis. Never write "you have endometriosis" or "you have been diagnosed". Always use conditional language: "if endometriosis is found", "should your doctor suspect", "if further tests suggest".
+- Never prescribe or recommend specific medications.
+- Always frame everything as something to discuss with or confirm with their doctor.
 
 Return ONLY valid JSON with these exact keys:
 
 {
-  "patient_summary": "2-3 warm sentences summarising what the score and cluster mean for this patient.",
+  "patient_summary": "2-3 warm sentences explaining what this score suggests and why further evaluation with a doctor is the right next step. Use language like 'your symptoms may suggest' or 'your results indicate it is worth exploring further'.",
   "top_symptom_guidance": [
     {"symptom": "symptom name", "guidance": "2-3 practical sentences on how to manage or cope with this symptom day-to-day."}
   ],
   "checkup_recommendations": [
     {"symptom": "symptom name", "doctor": "type of specialist (e.g. Gynaecologist, Gastroenterologist)", "checkup": "1-2 sentences on what to ask for and why."}
   ],
-  "if_confirmed": "2-3 sentences: what living with endometriosis can look like and the most important thing to know.",
+  "if_suspected": "2-3 sentences: what next steps could look like if a doctor suspects endometriosis, using conditional language throughout (e.g. 'if your doctor suspects...', 'should further tests confirm...'). Do not state a diagnosis.",
   "if_negative": "2-3 sentences: other conditions that could explain these symptoms and which directions to explore.",
   "questions_to_ask_doctor": ["question 1", "question 2", "question 3", "question 4", "question 5"],
   "closing_note": "2-3 warm sentences: the patient is not alone, the average diagnosis takes 7 years, and advocating for themselves is right."
@@ -251,8 +256,8 @@ function renderBrochure(data, date) {
       ${ornament()}
 
       <section class="brochure-section" aria-labelledby="bs-confirmed">
-        <h3 class="brochure-section-title" id="bs-confirmed">If Endometriosis Is Confirmed</h3>
-        <p class="brochure-body">${h(data.if_confirmed || data.if_diagnosis_confirmed?.intro || '')}</p>
+        <h3 class="brochure-section-title" id="bs-confirmed">If Endometriosis Is Suspected</h3>
+        <p class="brochure-body">${h(data.if_suspected || data.if_confirmed || '')}</p>
       </section>
 
       ${ornament()}

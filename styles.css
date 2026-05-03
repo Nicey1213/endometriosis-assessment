@@ -1148,13 +1148,13 @@ body::before {
 
 .brochure-checkup-doctor-title {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 9px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cream);
-  background: var(--accent);
-  padding: 4px 10px;
-  display: inline-block;
+  color: var(--ink-soft);
+  border-bottom: 1px solid rgba(26,22,20,0.2);
+  padding-bottom: 4px;
+  display: block;
   margin-bottom: 10px;
 }
 
