@@ -6,13 +6,16 @@ Return ONLY valid JSON with these exact keys:
 
 {
   "patient_summary": "2-3 warm sentences summarising what the score and cluster mean for this patient.",
-  "symptom_management": [
-    {"symptom": "symptom name", "tips": ["tip 1", "tip 2", "tip 3"]}
+  "top_symptom_guidance": [
+    {"symptom": "symptom name", "guidance": "2-3 practical sentences on how to manage or cope with this symptom day-to-day."}
   ],
-  "if_confirmed": "2-3 sentences: practical day-to-day advice if endometriosis is confirmed, specific to the reported symptoms.",
-  "if_negative": "2-3 sentences: other conditions that could explain the reported symptoms, and which types of doctor to ask about.",
+  "checkup_recommendations": [
+    {"symptom": "symptom name", "doctor": "type of specialist (e.g. Gynaecologist, Gastroenterologist)", "checkup": "1-2 sentences on what to ask for and why."}
+  ],
+  "if_confirmed": "2-3 sentences: what living with endometriosis can look like and the most important thing to know.",
+  "if_negative": "2-3 sentences: other conditions that could explain these symptoms and which directions to explore.",
   "questions_to_ask_doctor": ["question 1", "question 2", "question 3", "question 4", "question 5"],
-  "closing_note": "2-3 warm sentences reassuring the patient they are not alone, noting the average 7-year diagnostic delay, and encouraging them to advocate for themselves."
+  "closing_note": "2-3 warm sentences: the patient is not alone, the average diagnosis takes 7 years, and advocating for themselves is right."
 }`;
 
 const STATUS_STEPS = [
@@ -31,31 +34,33 @@ const OLLAMA_MODEL = 'llama3.2';
 
 // ─── Prompt builder ────────────────────────────────────────────────────────────
 function buildPrompt(result) {
-  const { score, cluster, topFactors, answers } = result;
+  const { score, cluster, answers } = result;
   const yesSymptoms = SYMPTOMS.filter(s => answers[s.key]);
-  const no  = SYMPTOMS.filter(s => !answers[s.key]).map(s => s.label);
-  const top = topFactors.map(f => `${f.label} (+${f.contribution.toFixed(2)})`).join(', ');
 
-  const numberedSymptoms = yesSymptoms.length
-    ? yesSymptoms.map((s, i) => `  ${i + 1}. ${s.label} — ${s.sub}`).join('\n')
+  // Top 4 by correlation weight — these get the management guidance section
+  const top4 = [...yesSymptoms]
+    .sort((a, b) => b.corr - a.corr)
+    .slice(0, 4);
+
+  const top4List = top4.length
+    ? top4.map((s, i) => `  ${i + 1}. ${s.label} (${s.sub})`).join('\n')
+    : '  (none reported)';
+
+  const allList = yesSymptoms.length
+    ? yesSymptoms.map((s, i) => `  ${i + 1}. ${s.label} (${s.sub})`).join('\n')
     : '  (none reported)';
 
   return `Patient profile:
-- Cumulative score: ${score.toFixed(2)} / 11.10
-- Cluster: ${cluster.id} (${cluster.name}) — ${cluster.diagnosed_pct}% confirmed diagnosis rate in reference cohort
-- Top contributing factors: ${top || 'None'}
-- Reported NO: ${no.join(', ') || 'None'}
+- Score: ${score.toFixed(2)} / 11.10
+- Cluster: ${cluster.id} (${cluster.name}) — ${cluster.diagnosed_pct}% confirmed diagnosis rate
 
-Reported YES symptoms (${yesSymptoms.length} total) — you MUST include ALL of these in the symptom_management array, one entry per symptom, in this exact order:
-${numberedSymptoms}
+For top_symptom_guidance — write exactly ${top4.length} entries, one for each of these (the 4 highest-weight symptoms):
+${top4List}
 
-RULES:
-- symptom_management must have exactly ${yesSymptoms.length} entries, one per symptom listed above.
-- Do not omit any symptom. Do not add symptoms not in the list above.
-- Each entry needs 3 practical tips written for a patient, not a doctor.
-- All other sections (if_diagnosis_confirmed, if_diagnosis_negative, questions_to_ask_doctor, closing_note) must also be fully completed.
+For checkup_recommendations — write exactly ${yesSymptoms.length} entries, one for every reported symptom:
+${allList}
 
-Generate the complete patient brochure JSON now.`;
+Generate the brochure JSON now.`;
 }
 
 // ─── Ollama streaming call ─────────────────────────────────────────────────────
@@ -173,13 +178,18 @@ function ornament() {
 function renderBrochure(data, date) {
   const preview = document.getElementById('brochure-preview');
 
-  const symptomCards = (data.symptom_management || []).map(item => `
+  const topGuidanceCards = (data.top_symptom_guidance || []).map(item => `
     <div class="brochure-card">
       <h3 class="brochure-card-title">${h(item.symptom)}</h3>
-      <ul class="brochure-tips">
-        ${(item.tips || []).map(t => `<li>${h(t)}</li>`).join('')}
-      </ul>
+      <p class="brochure-card-guidance">${h(item.guidance)}</p>
     </div>`).join('');
+
+  const checkupItems = (data.checkup_recommendations || []).map(item => `
+    <li class="brochure-checkup-item">
+      <span class="brochure-checkup-symptom">${h(item.symptom)}</span>
+      <span class="brochure-checkup-doctor">${h(item.doctor)}</span>
+      <p class="brochure-checkup-text">${h(item.checkup)}</p>
+    </li>`).join('');
 
   const ifNegativeText = h(data.if_negative || data.if_diagnosis_negative?.intro || '');
 
@@ -213,8 +223,17 @@ function renderBrochure(data, date) {
       ${ornament()}
 
       <section class="brochure-section" aria-labelledby="bs-manage">
-        <h3 class="brochure-section-title" id="bs-manage">Managing Your Symptoms</h3>
-        <div class="brochure-cards">${symptomCards}</div>
+        <h3 class="brochure-section-title" id="bs-manage">Managing Your Most Significant Symptoms</h3>
+        <p class="brochure-section-intro">The four symptoms below carry the highest clinical weight in your assessment. Here is some practical guidance for each.</p>
+        <div class="brochure-cards">${topGuidanceCards}</div>
+      </section>
+
+      ${ornament()}
+
+      <section class="brochure-section" aria-labelledby="bs-checkups">
+        <h3 class="brochure-section-title" id="bs-checkups">Recommended Checkups by Symptom</h3>
+        <p class="brochure-section-intro">For each symptom you reported, here is which specialist can help and what to ask about at your next appointment.</p>
+        <ul class="brochure-checkup-list">${checkupItems}</ul>
       </section>
 
       ${ornament()}
