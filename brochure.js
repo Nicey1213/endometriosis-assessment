@@ -1,60 +1,18 @@
 import { SYMPTOMS } from './data.js';
 
-const SYSTEM_PROMPT = `You are a patient education content specialist working alongside physicians. Your task is to generate a personalized take-home brochure based on a clinical endometriosis screening assessment.
+const SYSTEM_PROMPT = `You are a patient education writer. Write in warm, plain language (8th-grade level). Address the patient as "you". Never diagnose or prescribe. Frame everything as things to discuss with their doctor.
 
-You will receive:
-- The patient's reported symptom profile (25 yes/no answers)
-- Their cumulative correlation score (0–11.10)
-- Their assigned risk cluster (1=Very Low → 5=Very High)
-- The top 3 contributing symptoms
-
-Your output is a structured JSON object representing a patient-facing brochure. The brochure must:
-
-1. Be written in warm, accessible language at roughly an 8th-grade reading level. Avoid medical jargon; when clinical terms are unavoidable, define them parenthetically.
-
-2. Address the patient directly ("you", "your symptoms"), never refer to them in third person.
-
-3. Be tailored to BOTH possible scenarios:
-   - If endometriosis is eventually CONFIRMED: how to manage these specific symptoms day-to-day
-   - If endometriosis is RULED OUT: what other conditions could explain these specific symptoms, and what checkups to ask their doctor about
-
-4. Be specific to the symptoms the patient actually reported. Do not give generic advice about symptoms they didn't mention. For each symptom-management tip, name the symptom it addresses.
-
-5. For the differential workup section: organize recommended checkups by body system (gynecological, gastrointestinal, urological, musculoskeletal, mental health) and only include systems relevant to the reported symptoms. For each suggested checkup, briefly explain what it looks for in plain language.
-
-6. Always include a closing reassurance that the patient is not alone, that diagnostic delays are common (mention the 7-year average), and that advocating for their symptoms is appropriate.
-
-7. NEVER give a definitive diagnosis. NEVER prescribe medications. Frame everything as "things to discuss with your doctor."
-
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON with these exact keys:
 
 {
-  "patient_summary": "A 2-3 sentence personalized summary of what their score and cluster mean, written warmly.",
+  "patient_summary": "2-3 warm sentences summarising what the score and cluster mean for this patient.",
   "symptom_management": [
-    {
-      "symptom": "The reported symptom name (patient-friendly)",
-      "tips": ["Tip 1", "Tip 2", "Tip 3"]
-    }
+    {"symptom": "symptom name", "tips": ["tip 1", "tip 2", "tip 3"]}
   ],
-  "if_diagnosis_confirmed": {
-    "intro": "1-2 sentence intro about living with endometriosis.",
-    "key_strategies": ["Strategy 1 (1 sentence)", "Strategy 2", "Strategy 3", "Strategy 4"],
-    "lifestyle_notes": "1 paragraph on diet, exercise, sleep relevant to reported symptoms."
-  },
-  "if_diagnosis_negative": {
-    "intro": "1-2 sentence acknowledging the symptoms are still real and worth investigating.",
-    "differential_workup": [
-      {
-        "system": "Body system (e.g. Gastrointestinal)",
-        "rationale": "1 sentence on why this system is relevant given their symptoms",
-        "suggested_checkups": [
-          {"name": "Test/exam name", "purpose": "What it looks for, in plain words"}
-        ]
-      }
-    ]
-  },
-  "questions_to_ask_doctor": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"],
-  "closing_note": "2-3 sentence warm closing reaffirming the patient's experience is valid and they deserve answers."
+  "if_confirmed": "2-3 sentences: practical day-to-day advice if endometriosis is confirmed, specific to the reported symptoms.",
+  "if_negative": "2-3 sentences: other conditions that could explain the reported symptoms, and which types of doctor to ask about.",
+  "questions_to_ask_doctor": ["question 1", "question 2", "question 3", "question 4", "question 5"],
+  "closing_note": "2-3 warm sentences reassuring the patient they are not alone, noting the average 7-year diagnostic delay, and encouraging them to advocate for themselves."
 }`;
 
 const STATUS_STEPS = [
@@ -113,9 +71,9 @@ async function streamAPI(prompt, onChunk, onDone, onError) {
       ],
       stream: true,
       options: {
-        temperature: 0.1,   // near-deterministic — reduces variety between runs
-        num_predict: 6000,  // enough tokens for a full brochure with many symptoms
-        num_ctx: 8192       // context window large enough for prompt + output
+        temperature: 0.4,  // enough creativity without wild variation
+        num_predict: 2500, // sufficient for simplified schema
+        num_ctx: 4096      // smaller context = faster generation
       }
     });
   } catch { onError('Failed to build request.'); return; }
@@ -223,19 +181,7 @@ function renderBrochure(data, date) {
       </ul>
     </div>`).join('');
 
-  const diffSections = (data.if_diagnosis_negative?.differential_workup || []).map(sys => `
-    <div class="brochure-diff-block">
-      <h4 class="brochure-diff-system">${h(sys.system)}</h4>
-      <p class="brochure-diff-rationale">${h(sys.rationale)}</p>
-      <table class="brochure-diff-table">
-        <thead><tr><th>Checkup</th><th>What it looks for</th></tr></thead>
-        <tbody>
-          ${(sys.suggested_checkups || []).map(c =>
-            `<tr><td><strong>${h(c.name)}</strong></td><td>${h(c.purpose)}</td></tr>`
-          ).join('')}
-        </tbody>
-      </table>
-    </div>`).join('');
+  const ifNegativeText = h(data.if_negative || data.if_diagnosis_negative?.intro || '');
 
   const questions = (data.questions_to_ask_doctor || []).map(q => `
     <li class="brochure-question">
@@ -275,19 +221,14 @@ function renderBrochure(data, date) {
 
       <section class="brochure-section" aria-labelledby="bs-confirmed">
         <h3 class="brochure-section-title" id="bs-confirmed">If Endometriosis Is Confirmed</h3>
-        <p class="brochure-body">${h(data.if_diagnosis_confirmed?.intro || '')}</p>
-        <ol class="brochure-strategies">
-          ${(data.if_diagnosis_confirmed?.key_strategies || []).map(s => `<li>${h(s)}</li>`).join('')}
-        </ol>
-        <p class="brochure-body">${h(data.if_diagnosis_confirmed?.lifestyle_notes || '')}</p>
+        <p class="brochure-body">${h(data.if_confirmed || data.if_diagnosis_confirmed?.intro || '')}</p>
       </section>
 
       ${ornament()}
 
       <section class="brochure-section" aria-labelledby="bs-other">
         <h3 class="brochure-section-title" id="bs-other">If Other Causes Are Found</h3>
-        <p class="brochure-body">${h(data.if_diagnosis_negative?.intro || '')}</p>
-        ${diffSections}
+        <p class="brochure-body">${ifNegativeText}</p>
       </section>
 
       ${ornament()}
