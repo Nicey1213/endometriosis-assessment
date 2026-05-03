@@ -184,12 +184,24 @@ function renderBrochure(data, date) {
       <p class="brochure-card-guidance">${h(item.guidance)}</p>
     </div>`).join('');
 
-  const checkupItems = (data.checkup_recommendations || []).map(item => `
-    <li class="brochure-checkup-item">
-      <span class="brochure-checkup-symptom">${h(item.symptom)}</span>
-      <span class="brochure-checkup-doctor">${h(item.doctor)}</span>
-      <p class="brochure-checkup-text">${h(item.checkup)}</p>
-    </li>`).join('');
+  // Group checkup recommendations by specialist type
+  const byDoctor = {};
+  (data.checkup_recommendations || []).forEach(item => {
+    const doc = item.doctor || 'General Practitioner';
+    if (!byDoctor[doc]) byDoctor[doc] = [];
+    byDoctor[doc].push(item);
+  });
+  const checkupGroups = Object.entries(byDoctor).map(([doctor, items]) => `
+    <div class="brochure-checkup-group">
+      <h4 class="brochure-checkup-doctor-title">${h(doctor)}</h4>
+      <ul class="brochure-checkup-symptom-list">
+        ${items.map(item => `
+          <li class="brochure-checkup-item">
+            <span class="brochure-checkup-symptom">${h(item.symptom)}</span>
+            <p class="brochure-checkup-text">${h(item.checkup)}</p>
+          </li>`).join('')}
+      </ul>
+    </div>`).join('');
 
   const ifNegativeText = h(data.if_negative || data.if_diagnosis_negative?.intro || '');
 
