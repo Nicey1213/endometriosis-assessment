@@ -394,7 +394,7 @@ body::before {
 }
 .gauge-bar {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: 12.61fr 13.06fr 13.96fr 13.96fr 46.40fr;
   height: 10px;
   border: 1px solid var(--ink);
   overflow: visible;
