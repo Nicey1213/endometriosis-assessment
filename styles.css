@@ -416,8 +416,8 @@ body::before {
   pointer-events: none;
 }
 .gauge-labels {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 12.61fr 13.06fr 13.96fr 13.96fr 46.40fr;
   margin-top: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
@@ -425,6 +425,7 @@ body::before {
   color: var(--ink-light);
   text-transform: uppercase;
 }
+.gauge-labels span { text-align: center; }
 
 /* Interpretation */
 .interpretation-block {
