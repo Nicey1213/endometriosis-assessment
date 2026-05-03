@@ -245,7 +245,7 @@ function renderBrochure(data, date) {
       <section class="brochure-section" aria-labelledby="bs-checkups">
         <h3 class="brochure-section-title" id="bs-checkups">Recommended Checkups by Symptom</h3>
         <p class="brochure-section-intro">For each symptom you reported, here is which specialist can help and what to ask about at your next appointment.</p>
-        <ul class="brochure-checkup-list">${checkupItems}</ul>
+        <div class="brochure-checkup-container">${checkupGroups}</div>
       </section>
 
       ${ornament()}
