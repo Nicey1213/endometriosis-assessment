@@ -262,6 +262,147 @@ function pickN(arr, n) {
   return out;
 }
 
+// ─── OpenStreetMap real-data lookup (London-biased) ────────────────────────────
+const OSM_NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+const OSM_OVERPASS  = 'https://overpass-api.de/api/interpreter';
+const OSM_RADIUS_M  = 4000;
+const LONDON_CENTRE = { lat: 51.5074, lon: -0.1278, display: 'London, UK (default)' };
+
+async function fetchWithTimeout(url, opts = {}, ms = 18000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
+async function geocodePostalCode(postal) {
+  const cleaned = postal.replace(/\s+/g, ' ').trim();
+
+  // Attempt 1 — UK postcode lookup
+  try {
+    const url = `${OSM_NOMINATIM}?postalcode=${encodeURIComponent(cleaned)}&country=gb&format=json&limit=1`;
+    const r = await fetchWithTimeout(url, {}, 8000);
+    const j = await r.json();
+    if (j[0]) return { lat: +j[0].lat, lon: +j[0].lon, display: j[0].display_name };
+  } catch (_) {}
+
+  // Attempt 2 — free-text query biased to London
+  try {
+    const url = `${OSM_NOMINATIM}?q=${encodeURIComponent(cleaned + ', London, UK')}&format=json&limit=1`;
+    const r = await fetchWithTimeout(url, {}, 8000);
+    const j = await r.json();
+    if (j[0]) return { lat: +j[0].lat, lon: +j[0].lon, display: j[0].display_name };
+  } catch (_) {}
+
+  return null;
+}
+
+async function queryOverpass(lat, lon) {
+  const q = `[out:json][timeout:20];
+(
+  nwr["amenity"~"^(doctors|clinic)$"](around:${OSM_RADIUS_M},${lat},${lon});
+  nwr["healthcare"~"^(doctor|clinic|centre|physiotherapist)$"](around:${OSM_RADIUS_M},${lat},${lon});
+);
+out tags center 80;`;
+  const r = await fetchWithTimeout(OSM_OVERPASS, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(q)
+  }, 25000);
+  if (!r.ok) throw new Error('Overpass error ' + r.status);
+  return r.json();
+}
+
+const SPECIALTY_KEYWORDS = {
+  gyn:    ['gynae', 'gynec', 'obstet', 'women', 'maternal'],
+  gastro: ['gastro', 'digestive', 'endoscop'],
+  urol:   ['urol', 'bladder', 'kidney'],
+  endocri:['endocrin', 'hormone', 'thyroid'],
+  pain:   ['pain'],
+  psych:  ['psych', 'mental'],
+  physio: ['physio', 'physical therap'],
+  fertil: ['fertil', 'reproduct'],
+  general:['general', 'family', 'gp']
+};
+
+function specialtyMatchScore(specialist, tags) {
+  const s = (specialist || '').toLowerCase();
+  const hay = [
+    tags['healthcare:speciality'] || '',
+    tags['speciality'] || '',
+    tags.name || '',
+    tags['operator'] || ''
+  ].join(' ').toLowerCase();
+
+  for (const [key, words] of Object.entries(SPECIALTY_KEYWORDS)) {
+    if (s.includes(key)) {
+      for (const w of words) if (hay.includes(w)) return 2;
+      // Specialty mentioned in user's specialist name but no match in tags
+      return tags.healthcare === 'doctor' || tags.amenity === 'doctors' ? 1 : 0;
+    }
+  }
+  // GP-style fallback: any doctor's office is plausibly relevant
+  return tags.healthcare === 'doctor' || tags.amenity === 'doctors' ? 1 : 0;
+}
+
+function osmTopics(specialist, tags) {
+  const sp = (tags['healthcare:speciality'] || tags['speciality'] || '').trim();
+  if (sp) {
+    const list = sp.split(/[;,]/).map(x => x.trim()).filter(Boolean).slice(0, 3);
+    return list.map(t => t.charAt(0).toUpperCase() + t.slice(1));
+  }
+  return pickN(topicsFor(specialist), 3);
+}
+
+function osmToDoctor(el, specialist) {
+  const t = el.tags || {};
+  const num = t['addr:housenumber'] || '';
+  const street = t['addr:street'] || '';
+  const postcode = t['addr:postcode'] || '';
+  const city = t['addr:city'] || t['addr:suburb'] || t['addr:town'] || '';
+  const addr = [
+    [num, street].filter(Boolean).join(' '),
+    [postcode, city].filter(Boolean).join(' ')
+  ].filter(Boolean).join(', ');
+
+  return {
+    name:    t.name || t.operator || 'Medical Practice',
+    practice: t.amenity === 'clinic' ? 'Clinic'
+            : t.healthcare === 'physiotherapist' ? 'Physiotherapy'
+            : t.amenity === 'doctors' || t.healthcare === 'doctor' ? 'Medical Practice'
+            : t.healthcare === 'centre' ? 'Health Centre'
+            : 'Healthcare Provider',
+    address: addr || 'Address not listed in OSM',
+    topics:  osmTopics(specialist, t),
+    phone:   t.phone || t['contact:phone'] || null,
+    email:   t.email || t['contact:email'] || null,
+    website: t.website || t['contact:website'] || null
+  };
+}
+
+async function findRealDoctors(specialist, postal) {
+  const loc = (await geocodePostalCode(postal)) || LONDON_CENTRE;
+  let data;
+  try { data = await queryOverpass(loc.lat, loc.lon); }
+  catch (_) { return { doctors: [], location: loc.display, error: 'overpass' }; }
+
+  const seen = new Set();
+  const ranked = (data.elements || [])
+    .filter(el => {
+      const name = (el.tags?.name || '').trim();
+      if (!name) return false;
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(el => ({ el, score: specialtyMatchScore(specialist, el.tags || {}) }))
+    .sort((a, b) => b.score - a.score);
+
+  const doctors = ranked.slice(0, 6).map(r => osmToDoctor(r.el, specialist));
+  return { doctors, location: loc.display };
+}
+
 function generateFakeDoctors(specialist, postalCode) {
   const topics = topicsFor(specialist);
   const out = [];
@@ -312,9 +453,9 @@ function showFindPhysicianModal(specialist) {
       <button class="modal-close" id="fp-close" type="button" aria-label="Close">&times;</button>
       <p class="modal-eyebrow">Find a Physician</p>
       <h3 class="modal-title">Near you &middot; ${h(specialist)}</h3>
-      <p class="modal-body">Enter your postal code and we will list six practices in your area that handle this specialty.</p>
+      <p class="modal-body">Enter your postal code. We query <strong>OpenStreetMap</strong> for real medical practices nearby and rank them by relevance to <em>${h(specialist)}</em>. London-area postcodes give the best coverage; outside that we fall back to demonstration data.</p>
       <div class="modal-input-row">
-        <input type="text" id="fp-postal" class="modal-input" placeholder="e.g. SW1A 1AA" autocomplete="postal-code">
+        <input type="text" id="fp-postal" class="modal-input" placeholder="e.g. SW1A 1AA, EC1A 1BB, NW1 6XE" autocomplete="postal-code">
         <button class="submit-btn" id="fp-search" type="button">Search</button>
       </div>
       <div id="fp-results"></div>
@@ -330,29 +471,70 @@ function showFindPhysicianModal(specialist) {
   };
   document.addEventListener('keydown', escHandler);
 
-  const search = () => {
+  const renderDoctorCard = (d, isReal) => `
+    <li class="doctor-card">
+      <h4 class="doctor-name">${h(d.name)}</h4>
+      <p class="doctor-practice">${h(d.practice)} &middot; ${h(d.address)}</p>
+      <p class="doctor-topics">${(d.topics || []).map(t => `<span class="doctor-topic">${h(t)}</span>`).join('')}</p>
+      <p class="doctor-contact">
+        ${d.phone ? `<span class="doctor-contact-key">Phone</span> ${h(d.phone)}` : `<span class="doctor-contact-missing">Phone not listed</span>`}
+        <span class="doctor-contact-sep">&middot;</span>
+        ${d.email
+          ? `<span class="doctor-contact-key">Email</span> <a href="mailto:${h(d.email)}">${h(d.email)}</a>`
+          : isReal && d.website
+            ? `<span class="doctor-contact-key">Web</span> <a href="${h(d.website)}" target="_blank" rel="noopener">${h(d.website.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>`
+            : `<span class="doctor-contact-missing">Email not listed</span>`}
+      </p>
+    </li>`;
+
+  const search = async () => {
     const postal = document.getElementById('fp-postal').value.trim();
     if (!postal) {
       document.getElementById('fp-postal').focus();
       return;
     }
-    const doctors = generateFakeDoctors(specialist, postal);
-    document.getElementById('fp-results').innerHTML = `
-      <p class="modal-section-label">Six practices nearest to ${h(postal.toUpperCase())}</p>
-      <ul class="doctor-list">
-        ${doctors.map(d => `
-          <li class="doctor-card">
-            <h4 class="doctor-name">${h(d.name)}</h4>
-            <p class="doctor-practice">${h(d.practice)} &middot; ${h(d.address)}</p>
-            <p class="doctor-topics">${d.topics.map(t => `<span class="doctor-topic">${h(t)}</span>`).join('')}</p>
-            <p class="doctor-contact">
-              <span class="doctor-contact-key">Phone</span> ${h(d.phone)}
-              <span class="doctor-contact-sep">&middot;</span>
-              <span class="doctor-contact-key">Email</span> <a href="mailto:${h(d.email)}">${h(d.email)}</a>
-            </p>
-          </li>`).join('')}
-      </ul>
-      <p class="modal-fineprint">Demonstration data only. Practice details are fictional.</p>`;
+    const resultsEl = document.getElementById('fp-results');
+    const searchBtn = document.getElementById('fp-search');
+
+    resultsEl.innerHTML = `
+      <p class="modal-loading">
+        <span class="modal-loading-dot"></span>
+        Searching practices near <strong>${h(postal.toUpperCase())}</strong> via OpenStreetMap…
+      </p>`;
+    searchBtn.disabled = true;
+
+    let osm = null;
+    try { osm = await findRealDoctors(specialist, postal); }
+    catch (_) { osm = null; }
+
+    searchBtn.disabled = false;
+
+    if (osm && osm.doctors.length >= 3) {
+      resultsEl.innerHTML = `
+        <p class="modal-section-label">Up to six practices near ${h(osm.location)}</p>
+        <ul class="doctor-list">
+          ${osm.doctors.map(d => renderDoctorCard(d, true)).join('')}
+        </ul>
+        <p class="modal-fineprint">
+          Live data &middot; &copy; OpenStreetMap contributors (ODbL).
+          Some entries may have missing phone or email — this is normal for OSM.
+        </p>`;
+    } else {
+      const fallback = generateFakeDoctors(specialist, postal);
+      const reason = osm && osm.error === 'overpass'
+        ? 'OpenStreetMap is currently unreachable.'
+        : osm && osm.doctors.length === 0
+          ? 'No practices were found in OpenStreetMap for this area.'
+          : 'Not enough practices were found in OpenStreetMap for this area.';
+      resultsEl.innerHTML = `
+        <p class="modal-section-label">Six demo practices near ${h(postal.toUpperCase())}</p>
+        <ul class="doctor-list">
+          ${fallback.map(d => renderDoctorCard(d, false)).join('')}
+        </ul>
+        <p class="modal-fineprint">
+          ${h(reason)} Showing fictional demonstration data instead. Try a Greater London postcode (e.g. <strong>SW1A 1AA</strong>, <strong>EC1A 1BB</strong>, <strong>NW1 6XE</strong>) for live OSM results.
+        </p>`;
+    }
   };
   document.getElementById('fp-search').addEventListener('click', search);
   document.getElementById('fp-postal').addEventListener('keydown', e => {

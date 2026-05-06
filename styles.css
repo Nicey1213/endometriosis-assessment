@@ -976,6 +976,38 @@ body::before {
   color: var(--ink-light);
   text-align: center;
   margin-top: 8px;
+  line-height: 1.6;
+}
+
+.modal-loading {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.modal-loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: modalLoadPulse 1s ease-in-out infinite;
+}
+@keyframes modalLoadPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+
+.doctor-contact-missing {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-light);
+  font-style: italic;
 }
 
 /* ─── Mobile ─── */
