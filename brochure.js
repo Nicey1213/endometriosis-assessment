@@ -168,6 +168,191 @@ function setStep(area, idx) {
   });
 }
 
+// ─── Find-a-physician (fictional data) ────────────────────────────────────────
+const STREETS = [
+  'Oak Street', 'Maple Avenue', 'Church Lane', 'High Street', 'Mill Road',
+  'Park Avenue', 'Elm Drive', 'Main Street', 'Victoria Road', 'Queen Street',
+  "King's Road", 'Station Road', 'Bridge Street', 'Garden Lane', 'Cherry Tree Lane',
+  'Rose Hill', 'Ashford Road', 'Beech Grove', 'Cedar Close', 'Willow Way',
+  'Hawthorn Lane', 'Birch Avenue', 'Lavender Close', 'Meadow View', 'Linden Road'
+];
+
+const FIRST_NAMES = [
+  'Sarah', 'James', 'Emily', 'Michael', 'Olivia', 'William', 'Sophia',
+  'David', 'Charlotte', 'Thomas', 'Emma', 'Daniel', 'Grace', 'Henry',
+  'Isabella', 'Robert', 'Lily', 'Christopher', 'Alice', 'Edward'
+];
+
+const LAST_NAMES = [
+  'Mitchell', 'Thompson', 'Anderson', 'Roberts', 'Hughes', 'Walker',
+  'Foster', 'Bennett', 'Carter', 'Morgan', 'Wright', 'Cooper', 'Brooks',
+  'Reynolds', 'Sullivan', 'Hayes', 'Jenkins', 'Powell', 'Russell', 'Bryant'
+];
+
+const PRACTICE_SUFFIX = [
+  'Health Centre', 'Medical Practice', 'Wellness Clinic', 'Family Practice',
+  'Specialist Centre', 'Care Group', 'Medical Rooms', 'Women’s Health Clinic'
+];
+
+const TOPICS_BY_SPECIALIST = {
+  gyn: [
+    'Endometriosis care', 'Menstrual disorders', 'Hormonal therapy',
+    'Fertility consultations', 'Pelvic pain management', 'Minimally invasive surgery',
+    'Adenomyosis', 'PCOS', 'Menopause care', 'Contraception counselling'
+  ],
+  gastro: [
+    'IBS management', 'Endoscopy', 'Bowel disorders', 'Coeliac disease',
+    'Reflux & GERD', 'Inflammatory bowel disease', 'Bloating & motility',
+    'Colonoscopy screening', 'Functional GI disorders'
+  ],
+  urol: [
+    'Urinary tract issues', 'Pelvic floor disorders', 'Interstitial cystitis',
+    'Kidney stones', 'Incontinence', 'Bladder pain syndrome'
+  ],
+  endocri: [
+    'Hormonal imbalances', 'Thyroid disorders', 'PCOS management',
+    'Adrenal disorders', 'Diabetes care'
+  ],
+  general: [
+    'Family medicine', "Women's health", 'Preventive care',
+    'Chronic pain', 'Specialist referrals', 'Health screening'
+  ],
+  pain: [
+    'Chronic pain management', 'Nerve block procedures', 'Multidisciplinary pain care',
+    'Pelvic pain clinic', 'Medication review'
+  ],
+  physio: [
+    'Pelvic floor physiotherapy', 'Postural assessment', 'Manual therapy',
+    'Core stability', 'Rehabilitation programmes'
+  ],
+  psych: [
+    'Chronic pain coping', 'Anxiety & depression', 'Cognitive behavioural therapy',
+    'Health psychology'
+  ],
+  fertil: [
+    'Fertility assessment', 'IVF & assisted reproduction', 'Hormonal workup',
+    'Reproductive surgery'
+  ]
+};
+
+const DEFAULT_TOPICS = ['General consultation', 'Specialist referral', 'Diagnostic workup', 'Follow-up care'];
+
+function topicsFor(specialist) {
+  const s = specialist.toLowerCase();
+  for (const [key, list] of Object.entries(TOPICS_BY_SPECIALIST)) {
+    if (s.includes(key)) return list;
+  }
+  return DEFAULT_TOPICS;
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function pickN(arr, n) {
+  const copy = [...arr], out = [];
+  while (out.length < n && copy.length) {
+    out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+  }
+  return out;
+}
+
+function generateFakeDoctors(specialist, postalCode) {
+  const topics = topicsFor(specialist);
+  const out = [];
+  const usedKeys = new Set();
+  for (let i = 0; i < 6; i++) {
+    let first, last, key;
+    do {
+      first = pick(FIRST_NAMES);
+      last  = pick(LAST_NAMES);
+      key   = first + last;
+    } while (usedKeys.has(key));
+    usedKeys.add(key);
+    const street     = pick(STREETS);
+    const number     = Math.floor(Math.random() * 200) + 1;
+    const practice   = `${last} ${pick(PRACTICE_SUFFIX)}`;
+    const docTopics  = pickN(topics, 3);
+    const phoneArea  = ['020', '0161', '0117', '0131', '0121'][Math.floor(Math.random() * 5)];
+    const phoneRest  = `${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)}`;
+    const slug       = last.toLowerCase().replace(/[^a-z]/g, '');
+    const email      = `appointments@${slug}-${specialist.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8)}.example`;
+    out.push({
+      name:    `Dr ${first} ${last}`,
+      practice,
+      address: `${number} ${street}, ${postalCode.toUpperCase()}`,
+      topics:  docTopics,
+      phone:   `${phoneArea} ${phoneRest}`,
+      email
+    });
+  }
+  return out;
+}
+
+function ensureFindModal() {
+  let modal = document.getElementById('find-physician-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.id = 'find-physician-modal';
+  modal.className = 'modal-overlay no-print';
+  modal.hidden = true;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function showFindPhysicianModal(specialist) {
+  const modal = ensureFindModal();
+  modal.innerHTML = `
+    <div class="modal-box find-modal-box">
+      <button class="modal-close" id="fp-close" type="button" aria-label="Close">&times;</button>
+      <p class="modal-eyebrow">Find a Physician</p>
+      <h3 class="modal-title">Near you &middot; ${h(specialist)}</h3>
+      <p class="modal-body">Enter your postal code and we will list six practices in your area that handle this specialty.</p>
+      <div class="modal-input-row">
+        <input type="text" id="fp-postal" class="modal-input" placeholder="e.g. SW1A 1AA" autocomplete="postal-code">
+        <button class="submit-btn" id="fp-search" type="button">Search</button>
+      </div>
+      <div id="fp-results"></div>
+    </div>`;
+  modal.hidden = false;
+  setTimeout(() => document.getElementById('fp-postal')?.focus(), 30);
+
+  const close = () => { modal.hidden = true; };
+  document.getElementById('fp-close').addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  const escHandler = e => {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  const search = () => {
+    const postal = document.getElementById('fp-postal').value.trim();
+    if (!postal) {
+      document.getElementById('fp-postal').focus();
+      return;
+    }
+    const doctors = generateFakeDoctors(specialist, postal);
+    document.getElementById('fp-results').innerHTML = `
+      <p class="modal-section-label">Six practices nearest to ${h(postal.toUpperCase())}</p>
+      <ul class="doctor-list">
+        ${doctors.map(d => `
+          <li class="doctor-card">
+            <h4 class="doctor-name">${h(d.name)}</h4>
+            <p class="doctor-practice">${h(d.practice)} &middot; ${h(d.address)}</p>
+            <p class="doctor-topics">${d.topics.map(t => `<span class="doctor-topic">${h(t)}</span>`).join('')}</p>
+            <p class="doctor-contact">
+              <span class="doctor-contact-key">Phone</span> ${h(d.phone)}
+              <span class="doctor-contact-sep">&middot;</span>
+              <span class="doctor-contact-key">Email</span> <a href="mailto:${h(d.email)}">${h(d.email)}</a>
+            </p>
+          </li>`).join('')}
+      </ul>
+      <p class="modal-fineprint">Demonstration data only. Practice details are fictional.</p>`;
+  };
+  document.getElementById('fp-search').addEventListener('click', search);
+  document.getElementById('fp-postal').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); search(); }
+  });
+}
+
 // ─── SVG ornament ──────────────────────────────────────────────────────────────
 function ornament() {
   return `<div class="brochure-ornament" aria-hidden="true">
@@ -198,7 +383,10 @@ function renderBrochure(data, date) {
   });
   const checkupGroups = Object.entries(byDoctor).map(([doctor, items]) => `
     <div class="brochure-checkup-group">
-      <h4 class="brochure-checkup-doctor-title">${h(doctor)}</h4>
+      <div class="brochure-checkup-header">
+        <h4 class="brochure-checkup-doctor-title">${h(doctor)}</h4>
+        <button class="find-physician-btn no-print" type="button" data-specialist="${h(doctor)}">Find a physician</button>
+      </div>
       <ul class="brochure-checkup-symptom-list">
         ${items.map(item => `
           <li class="brochure-checkup-item">
@@ -308,7 +496,12 @@ function downloadPDF(date) {
     margin:      [20, 18, 20, 18],
     filename:    `endometriosis-brochure-${date}.pdf`,
     image:       { type: 'jpeg', quality: 0.97 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      ignoreElements: el => el.classList && el.classList.contains('no-print')
+    },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak:   { mode: ['css', 'legacy'], before: '.brochure-section' }
   }).from(el).save();
@@ -411,4 +604,16 @@ export function initBrochure() {
   if (!btn || btn._init) return;
   btn._init = true;
   btn.addEventListener('click', () => runGeneration());
+
+  // Delegated handler for "Find a physician" buttons inside the brochure preview
+  const preview = document.getElementById('brochure-preview');
+  if (preview && !preview._findInit) {
+    preview._findInit = true;
+    preview.addEventListener('click', e => {
+      const fb = e.target.closest('.find-physician-btn');
+      if (!fb) return;
+      e.preventDefault();
+      showFindPhysicianModal(fb.dataset.specialist || 'Specialist');
+    });
+  }
 }
