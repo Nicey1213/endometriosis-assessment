@@ -1280,9 +1280,10 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   border-bottom: 1px solid rgba(26,22,20,0.2);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
   margin-bottom: 10px;
 }
 .brochure-checkup-doctor-title {

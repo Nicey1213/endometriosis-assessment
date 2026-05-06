@@ -59,13 +59,20 @@ function buildPrompt(result) {
 - Score: ${score.toFixed(2)} / 11.10
 - Cluster: ${cluster.id} (${cluster.name}) — ${cluster.diagnosed_pct}% confirmed diagnosis rate
 
-For top_symptom_guidance — write exactly ${top4.length} entries, one for each of these (the 4 highest-weight symptoms):
+You MUST fill every key in the JSON schema. Do not leave any field empty or use empty arrays.
+
+Required content per key:
+- patient_summary: 2–3 sentences (minimum 50 words)
+- top_symptom_guidance: exactly ${top4.length} entries, one for each of the 4 highest-weight symptoms below:
 ${top4List}
-
-For checkup_recommendations — write exactly ${yesSymptoms.length} entries, one for every reported symptom:
+- checkup_recommendations: exactly ${yesSymptoms.length} entries, one for every reported symptom below:
 ${allList}
+- if_suspected: 2–3 sentences (minimum 40 words) using conditional language
+- if_negative: 2–3 sentences (minimum 40 words) covering at least 2 alternative conditions
+- questions_to_ask_doctor: exactly 5 questions
+- closing_note: 2–3 warm sentences (minimum 40 words)
 
-Generate the brochure JSON now.`;
+Generate the complete brochure JSON now.`;
 }
 
 // ─── Ollama streaming call ─────────────────────────────────────────────────────
@@ -365,13 +372,18 @@ function ornament() {
 }
 
 // ─── Brochure HTML renderer ────────────────────────────────────────────────────
+function fallback(text, alt) {
+  const t = String(text ?? '').trim();
+  return t.length ? text : alt;
+}
+
 function renderBrochure(data, date) {
   const preview = document.getElementById('brochure-preview');
 
   const topGuidanceCards = (data.top_symptom_guidance || []).map(item => `
     <div class="brochure-card">
       <h3 class="brochure-card-title">${h(item.symptom)}</h3>
-      <p class="brochure-card-guidance">${h(item.guidance)}</p>
+      <p class="brochure-card-guidance">${h(fallback(item.guidance, 'Discuss management strategies for this symptom with your doctor at your next appointment.'))}</p>
     </div>`).join('');
 
   // Group checkup recommendations by specialist type
@@ -396,9 +408,29 @@ function renderBrochure(data, date) {
       </ul>
     </div>`).join('');
 
-  const ifNegativeText = h(data.if_negative || data.if_diagnosis_negative?.intro || '');
+  const patientSummary = h(fallback(data.patient_summary,
+    'Your symptoms suggest it is worth speaking with a specialist about endometriosis. The following pages outline what you can do day-to-day and which conversations are worth having with your doctor.'));
 
-  const questions = (data.questions_to_ask_doctor || []).map(q => `
+  const ifSuspectedText = h(fallback(data.if_suspected || data.if_confirmed,
+    'If your doctor suspects endometriosis, they may suggest further tests such as a pelvic exam, ultrasound, or MRI. Treatment options vary widely and should be discussed with a specialist who knows your full history.'));
+
+  const ifNegativeText = h(fallback(data.if_negative || data.if_diagnosis_negative?.intro,
+    'If endometriosis is ruled out, your symptoms could still have several explanations — for example irritable bowel syndrome, adenomyosis, or pelvic floor dysfunction. Your doctor can help guide the next step in working out which is most likely.'));
+
+  const closingNote = h(fallback(data.closing_note,
+    'Remember: the average path to an endometriosis diagnosis takes around seven years. Trust what you know about your own body, and keep advocating for yourself in every appointment.'));
+
+  const fallbackQuestions = [
+    'What would you suggest as the next step in investigating my symptoms?',
+    'Are there imaging tests or referrals you would recommend?',
+    'Could anything else explain what I am experiencing?',
+    'What can I do day-to-day to manage my symptoms?',
+    'When should I come back to review how things are going?'
+  ];
+  const questionsArr = (Array.isArray(data.questions_to_ask_doctor) && data.questions_to_ask_doctor.length)
+    ? data.questions_to_ask_doctor
+    : fallbackQuestions;
+  const questions = questionsArr.map(q => `
     <li class="brochure-question">
       <span class="brochure-checkbox" aria-hidden="true">&#9744;</span>
       <span>${h(q)}</span>
@@ -422,7 +454,7 @@ function renderBrochure(data, date) {
 
       <section class="brochure-section" aria-labelledby="bs-you">
         <h3 class="brochure-section-title" id="bs-you">For You</h3>
-        <blockquote class="brochure-pullquote">${h(data.patient_summary || '')}</blockquote>
+        <blockquote class="brochure-pullquote">${patientSummary}</blockquote>
       </section>
 
       ${ornament()}
@@ -445,7 +477,7 @@ function renderBrochure(data, date) {
 
       <section class="brochure-section" aria-labelledby="bs-confirmed">
         <h3 class="brochure-section-title" id="bs-confirmed">If Endometriosis Is Suspected</h3>
-        <p class="brochure-body">${h(data.if_suspected || data.if_confirmed || '')}</p>
+        <p class="brochure-body">${ifSuspectedText}</p>
       </section>
 
       ${ornament()}
@@ -466,7 +498,7 @@ function renderBrochure(data, date) {
 
       <section class="brochure-section brochure-section--closing" aria-labelledby="bs-note">
         <h3 class="brochure-section-title" id="bs-note">A Note for You</h3>
-        <p class="brochure-closing">${h(data.closing_note || '')}</p>
+        <p class="brochure-closing">${closingNote}</p>
       </section>
 
       <footer class="brochure-doc-footer">
